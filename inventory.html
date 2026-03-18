@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭物品管理系统</title>
+    <style>
+        /* CSS 变量，方便统一管理和后期修改主题色 */
+        :root {
+            --primary-color: #4a90e2;
+            --primary-hover: #357abd;
+            --background-color: #f4f6f8;
+            --surface-color: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--background-color); 
+            color: var(--text-primary); 
+            line-height: 1.5; 
+            padding: 30px 20px; 
+        }
+
+        header { text-align: center; margin-bottom: 40px; }
+        h1 { font-weight: 600; font-size: 28px; letter-spacing: -0.5px; }
+        p.subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 5px; }
+
+        /* 采用 Grid 布局，左侧表单，右侧数据，自动响应式 */
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            display: grid; 
+            grid-template-columns: 350px 1fr; 
+            gap: 30px; 
+        }
+
+        @media (max-width: 860px) { 
+            .container { grid-template-columns: 1fr; } 
+        }
+
+        /* 卡片样式 */
+        .panel { 
+            background: var(--surface-color); 
+            padding: 24px; 
+            border-radius: var(--radius); 
+            box-shadow: var(--shadow); 
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 { 
+            font-size: 18px; 
+            margin-bottom: 20px; 
+            font-weight: 600;
+        }
+
+        /* 表单样式 */
+        .form-group { margin-bottom: 16px; }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-size: 14px; 
+            font-weight: 500;
+            color: var(--text-primary); 
+        }
+        
+        input, select { 
+            width: 100%; 
+            padding: 10px 12px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 6px; 
+            font-size: 14px; 
+            transition: all 0.2s ease; 
+            background-color: #f9fafb;
+        }
+        
+        input:focus, select:focus { 
+            outline: none; 
+            border-color: var(--primary-color); 
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+
+        button { 
+            background-color: var(--primary-color); 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 15px; 
+            font-weight: 500;
+            width: 100%; 
+            transition: background 0.2s; 
+            margin-top: 10px;
+        }
+        
+        button:hover { background-color: var(--primary-hover); }
+
+        /* 表格样式 */
+        .table-container { overflow-x: auto; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            white-space: nowrap;
+        }
+        
+        th, td { 
+            text-align: left; 
+            padding: 14px 16px; 
+            border-bottom: 1px solid var(--border-color); 
+            font-size: 14px; 
+        }
+        
+        th { 
+            color: var(--text-secondary); 
+            font-weight: 500; 
+            background-color: #f9fafb;
+        }
+        
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background-color: #f9fafb; }
+
+        .tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            background-color: #e5edff;
+            color: #1e40af;
+        }
+
+        .delete-btn { 
+            background-color: transparent; 
+            color: #ef4444; 
+            border: 1px solid #ef4444;
+            padding: 4px 10px; 
+            font-size: 12px; 
+            border-radius: 4px;
+            width: auto;
+            margin-top: 0;
+        }
+        
+        .delete-btn:hover { background-color: #fef2f2; }
+        
+        .empty-state { 
+            text-align: center; 
+            color: var(--text-secondary); 
+            padding: 40px 20px; 
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>家庭物品管理系统</h1>
+        <p class="subtitle">掌控家庭资产，告别翻箱倒柜</p>
+    </header>
+
+    <div class="container">
+        <div class="panel">
+            <h2>入库登记</h2>
+            <form id="itemForm">
+                <div class="form-group">
+                    <label for="itemName">物品名称</label>
+                    <input type="text" id="itemName" required placeholder="例如：Switch 游戏机、房产证">
+                </div>
+                <div class="form-group">
+                    <label for="itemCategory">所属分类</label>
+                    <select id="itemCategory">
+                        <option value="数码家电">数码家电</option>
+                        <option value="家具家居">家具家居</option>
+                        <option value="重要证件">重要证件</option>
+                        <option value="服饰鞋包">服饰鞋包</option>
+                        <option value="其他闲置">其他闲置</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="itemLocation">存放位置</label>
+                    <input type="text" id="itemLocation" required placeholder="例如：电视柜左侧抽屉">
+                </div>
+                <div class="form-group">
+                    <label for="itemDate">购入/建档日期</label>
+                    <input type="date" id="itemDate">
+                </div>
+                <button type="submit">保存物品</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2>物品清单</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>物品名称</th>
+                            <th>分类</th>
+                            <th>存放位置</th>
+                            <th>日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryList">
+                        </tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="empty-state">当前没有记录任何物品，请在左侧添加。</div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 DOM 元素
+        const form = document.getElementById('itemForm');
+        const inventoryList = document.getElementById('inventoryList');
+        const emptyState = document.getElementById('emptyState');
+        
+        // 从 Local Storage 获取数据，如果没有则初始化为空数组
+        let items = JSON.parse(localStorage.getItem('homeInventoryData')) || [];
+
+        // 设置默认日期为今天
+        document.getElementById('itemDate').valueAsDate = new Date();
+
+        // 渲染表格数据
+        function renderItems() {
+            inventoryList.innerHTML = '';
+            
+            if (items.length === 0) {
+                emptyState.style.display = 'block';
+                document.querySelector('table').style.display = 'none';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            document.querySelector('table').style.display = 'table';
+            
+            // 倒序遍历，让新添加的物品显示在最上面
+            items.slice().reverse().forEach((item, reverseIndex) => {
+                const actualIndex = items.length - 1 - reverseIndex;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 500; color: #111827;">${item.name}</td>
+                    <td><span class="tag">${item.category}</span></td>
+                    <td>${item.location}</td>
+                    <td style="color: #6b7280;">${item.date || '-'}</td>
+                    <td><button class="delete-btn" onclick="deleteItem(${actualIndex})">删除</button></td>
+                `;
+                inventoryList.appendChild(tr);
+            });
+        }
+
+        // 删除物品逻辑
+        function deleteItem(index) {
+            if(confirm('确定要删除这条物品记录吗？')) {
+                items.splice(index, 1);
+                localStorage.setItem('homeInventoryData', JSON.stringify(items));
+                renderItems();
+            }
+        }
+
+        // 提交表单逻辑
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const newItem = {
+                name: document.getElementById('itemName').value,
+                category: document.getElementById('itemCategory').value,
+                location: document.getElementById('itemLocation').value,
+                date: document.getElementById('itemDate').value
+            };
+            
+            items.push(newItem);
+            localStorage.setItem('homeInventoryData', JSON.stringify(items));
+            
+            renderItems();
+            
+            // 清空除日期和分类外的表单输入
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemLocation').value = '';
+            document.getElementById('itemName').focus();
+        });
+
+        // 首次加载渲染
+        renderItems();
+    </script>
+</body>
+</html>
