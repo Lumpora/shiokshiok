@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>家庭物品管理系统</title>
+    <title>家庭物品管理系统 - 云端同步版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* CSS 变量，方便统一管理和后期修改主题色 */
         :root {
             --primary-color: #4a90e2;
             --primary-hover: #357abd;
@@ -32,7 +32,6 @@
         h1 { font-weight: 600; font-size: 28px; letter-spacing: -0.5px; }
         p.subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 5px; }
 
-        /* 采用 Grid 布局，左侧表单，右侧数据，自动响应式 */
         .container { 
             max-width: 1200px; 
             margin: 0 auto; 
@@ -45,122 +44,66 @@
             .container { grid-template-columns: 1fr; } 
         }
 
-        /* 卡片样式 */
         .panel { 
             background: var(--surface-color); 
             padding: 24px; 
             border-radius: var(--radius); 
             box-shadow: var(--shadow); 
             border: 1px solid var(--border-color);
+            position: relative;
         }
 
-        .panel h2 { 
-            font-size: 18px; 
-            margin-bottom: 20px; 
-            font-weight: 600;
-        }
+        .panel h2 { font-size: 18px; margin-bottom: 20px; font-weight: 600; }
 
-        /* 表单样式 */
         .form-group { margin-bottom: 16px; }
-        label { 
-            display: block; 
-            margin-bottom: 8px; 
-            font-size: 14px; 
-            font-weight: 500;
-            color: var(--text-primary); 
-        }
+        label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--text-primary); }
         
         input, select { 
-            width: 100%; 
-            padding: 10px 12px; 
-            border: 1px solid var(--border-color); 
-            border-radius: 6px; 
-            font-size: 14px; 
-            transition: all 0.2s ease; 
-            background-color: #f9fafb;
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); 
+            border-radius: 6px; font-size: 14px; transition: all 0.2s ease; background-color: #f9fafb;
         }
         
         input:focus, select:focus { 
-            outline: none; 
-            border-color: var(--primary-color); 
-            background-color: #fff;
+            outline: none; border-color: var(--primary-color); background-color: #fff;
             box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
         }
 
         button { 
-            background-color: var(--primary-color); 
-            color: white; 
-            border: none; 
-            padding: 12px 20px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            font-size: 15px; 
-            font-weight: 500;
-            width: 100%; 
-            transition: background 0.2s; 
-            margin-top: 10px;
+            background-color: var(--primary-color); color: white; border: none; 
+            padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 15px; 
+            font-weight: 500; width: 100%; transition: background 0.2s; margin-top: 10px;
         }
         
         button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
 
-        /* 表格样式 */
         .table-container { overflow-x: auto; }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            white-space: nowrap;
-        }
-        
-        th, td { 
-            text-align: left; 
-            padding: 14px 16px; 
-            border-bottom: 1px solid var(--border-color); 
-            font-size: 14px; 
-        }
-        
-        th { 
-            color: var(--text-secondary); 
-            font-weight: 500; 
-            background-color: #f9fafb;
-        }
-        
+        table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+        th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        th { color: var(--text-secondary); font-weight: 500; background-color: #f9fafb; }
         tr:last-child td { border-bottom: none; }
-        tr:hover td { background-color: #f9fafb; }
-
-        .tag {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-            background-color: #e5edff;
-            color: #1e40af;
-        }
+        
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; background-color: #e5edff; color: #1e40af; }
 
         .delete-btn { 
-            background-color: transparent; 
-            color: #ef4444; 
-            border: 1px solid #ef4444;
-            padding: 4px 10px; 
-            font-size: 12px; 
-            border-radius: 4px;
-            width: auto;
-            margin-top: 0;
+            background-color: transparent; color: #ef4444; border: 1px solid #ef4444;
+            padding: 4px 10px; font-size: 12px; border-radius: 4px; width: auto; margin-top: 0;
         }
-        
         .delete-btn:hover { background-color: #fef2f2; }
         
-        .empty-state { 
-            text-align: center; 
-            color: var(--text-secondary); 
-            padding: 40px 20px; 
-            font-size: 14px;
+        .empty-state { text-align: center; color: var(--text-secondary); padding: 40px 20px; font-size: 14px; }
+        .loading-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8); display: flex; justify-content: center;
+            align-items: center; font-size: 14px; color: var(--primary-color);
+            border-radius: var(--radius); display: none; z-index: 10;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>家庭物品管理系统</h1>
+        <h1>家庭物品管理系统 <span style="font-size: 12px; background: #10b981; color: white; padding: 2px 6px; border-radius: 10px; vertical-align: middle;">云同步版</span></h1>
         <p class="subtitle">掌控家庭资产，告别翻箱倒柜</p>
     </header>
 
@@ -190,11 +133,12 @@
                     <label for="itemDate">购入/建档日期</label>
                     <input type="date" id="itemDate">
                 </div>
-                <button type="submit">保存物品</button>
+                <button type="submit" id="submitBtn">保存至云端</button>
             </form>
         </div>
 
         <div class="panel">
+            <div class="loading-overlay" id="loadingOverlay">正在从云端加载数据...</div>
             <h2>物品清单</h2>
             <div class="table-container">
                 <table>
@@ -211,23 +155,56 @@
                         </tbody>
                 </table>
             </div>
-            <div id="emptyState" class="empty-state">当前没有记录任何物品，请在左侧添加。</div>
+            <div id="emptyState" class="empty-state">当前云端没有记录，请在左侧添加。</div>
         </div>
     </div>
 
     <script>
-        // 初始化 DOM 元素
+        // ==========================================
+        // 1. 初始化 Supabase 连接 
+        // ==========================================
+        const supabaseUrl = 'https://ipenghldeyxmkbqjngqe.supabase.co'; 
+        const supabaseKey = 'sb_publishable_bg5MXHDR6xGhpdRmxvtOVg_TjFg2CrF';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // DOM 元素
         const form = document.getElementById('itemForm');
         const inventoryList = document.getElementById('inventoryList');
         const emptyState = document.getElementById('emptyState');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const submitBtn = document.getElementById('submitBtn');
         
-        // 从 Local Storage 获取数据，如果没有则初始化为空数组
-        let items = JSON.parse(localStorage.getItem('homeInventoryData')) || [];
+        let items = []; // 本地数据缓存
 
-        // 设置默认日期为今天
         document.getElementById('itemDate').valueAsDate = new Date();
 
-        // 渲染表格数据
+        // ==========================================
+        // 2. 从云端获取数据 (SELECT)
+        // ==========================================
+        async function fetchItems() {
+            loadingOverlay.style.display = 'flex'; // 显示加载动画
+            
+            // 从 inventory 表获取数据，按创建时间倒序排列
+            const { data, error } = await supabaseClient
+                .from('inventory')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            loadingOverlay.style.display = 'none'; // 隐藏加载动画
+
+            if (error) {
+                console.error('获取数据失败:', error);
+                alert('获取云端数据失败，请检查 URL 是否正确或 RLS 是否关闭');
+                return;
+            }
+
+            items = data;
+            renderItems();
+        }
+
+        // ==========================================
+        // 3. 渲染表格数据
+        // ==========================================
         function renderItems() {
             inventoryList.innerHTML = '';
             
@@ -240,33 +217,26 @@
             emptyState.style.display = 'none';
             document.querySelector('table').style.display = 'table';
             
-            // 倒序遍历，让新添加的物品显示在最上面
-            items.slice().reverse().forEach((item, reverseIndex) => {
-                const actualIndex = items.length - 1 - reverseIndex;
+            items.forEach((item, index) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="font-weight: 500; color: #111827;">${item.name}</td>
                     <td><span class="tag">${item.category}</span></td>
                     <td>${item.location}</td>
                     <td style="color: #6b7280;">${item.date || '-'}</td>
-                    <td><button class="delete-btn" onclick="deleteItem(${actualIndex})">删除</button></td>
+                    <td><button class="delete-btn" onclick="deleteItem('${item.id}', ${index})">删除</button></td>
                 `;
                 inventoryList.appendChild(tr);
             });
         }
 
-        // 删除物品逻辑
-        function deleteItem(index) {
-            if(confirm('确定要删除这条物品记录吗？')) {
-                items.splice(index, 1);
-                localStorage.setItem('homeInventoryData', JSON.stringify(items));
-                renderItems();
-            }
-        }
-
-        // 提交表单逻辑
-        form.addEventListener('submit', function(e) {
+        // ==========================================
+        // 4. 新增物品至云端 (INSERT)
+        // ==========================================
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.innerText = '正在保存...';
             
             const newItem = {
                 name: document.getElementById('itemName').value,
@@ -275,19 +245,58 @@
                 date: document.getElementById('itemDate').value
             };
             
-            items.push(newItem);
-            localStorage.setItem('homeInventoryData', JSON.stringify(items));
+            // 写入 Supabase
+            const { data, error } = await supabaseClient
+                .from('inventory')
+                .insert([newItem])
+                .select(); // 插入后返回生成的数据（包含自动生成的 ID）
+
+            submitBtn.disabled = false;
+            submitBtn.innerText = '保存至云端';
+
+            if (error) {
+                console.error('保存失败:', error);
+                alert('保存失败！请确认已在 Supabase 关闭该表的 RLS 安全策略。');
+                return;
+            }
             
-            renderItems();
+            // 将云端返回的新数据塞入本地列表开头，重新渲染
+            if(data && data.length > 0) {
+                items.unshift(data[0]); 
+                renderItems();
+            }
             
-            // 清空除日期和分类外的表单输入
+            // 清空表单
             document.getElementById('itemName').value = '';
             document.getElementById('itemLocation').value = '';
             document.getElementById('itemName').focus();
         });
 
-        // 首次加载渲染
-        renderItems();
+        // ==========================================
+        // 5. 从云端删除物品 (DELETE)
+        // ==========================================
+        async function deleteItem(id, index) {
+            if(confirm('确定要从云端彻底删除这条记录吗？')) {
+                // 根据数据库里的真实 ID 删除
+                const { error } = await supabaseClient
+                    .from('inventory')
+                    .delete()
+                    .eq('id', id);
+                
+                if (error) {
+                    console.error('删除失败:', error);
+                    alert('删除失败！');
+                    return;
+                }
+
+                // 本地同步删除并渲染
+                items.splice(index, 1);
+                renderItems();
+            }
+        }
+
+        // 首次加载时，触发从云端拉取数据
+        fetchItems();
     </script>
 </body>
 </html>
