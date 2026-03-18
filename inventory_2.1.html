@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭物品管理系统 - 空间全景版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2; --primary-hover: #357abd;
+            --background-color: #f4f6f8; --surface-color: #ffffff;
+            --text-primary: #111827; --text-secondary: #6b7280;
+            --border-color: #e5e7eb; --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            --grid-color: #10b981; 
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: var(--background-color); color: var(--text-primary); padding: 20px; }
+        
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { font-weight: 600; font-size: 26px; }
+        p.subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 5px; }
+
+        .layout-wrapper { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+        
+        .room-panel { background: var(--surface-color); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        .room-panel h2 { font-size: 16px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .room-tip { font-size: 12px; color: var(--text-secondary); font-weight: normal; }
+        
+        /* 修改为 5x5 网格 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px; /* 格子变少了，间距可以稍微放大一点 */
+            background-color: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .grid-cell {
+            aspect-ratio: 1;
+            background-color: #ffffff;
+            border: 1px dashed #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px; /* 字号放大 */
+            text-align: center;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            user-select: none;
+            overflow: hidden;
+            word-break: break-all;
+            padding: 4px;
+        }
+        .grid-cell:hover { border-color: var(--primary-color); background-color: #eff6ff; }
+        .grid-cell.filled {
+            background-color: var(--grid-color);
+            border: 1px solid #059669;
+            color: white;
+            font-weight: 500;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2);
+            cursor: grab;
+        }
+        .grid-cell.filled:active { cursor: grabbing; }
+        .grid-cell.drag-over { background-color: #fcd34d !important; border-color: #d97706 !important; }
+
+        .main-content { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+        @media (max-width: 860px) { .main-content { grid-template-columns: 1fr; } }
+
+        .panel { background: var(--surface-color); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border-color); position: relative; }
+        .panel h2 { font-size: 16px; margin-bottom: 15px; }
+
+        .form-group { margin-bottom: 14px; }
+        label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background-color: #f9fafb; }
+        input:focus, select:focus { outline: none; border-color: var(--primary-color); background-color: #fff; box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1); }
+        
+        button { background-color: var(--primary-color); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 14px; width: 100%; transition: background 0.2s; }
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-secondary); background-color: #f9fafb; font-weight: 500; }
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; background-color: #e5edff; color: #1e40af; }
+        .delete-btn { background: transparent; color: #ef4444; border: 1px solid #ef4444; padding: 4px 8px; width: auto; font-size: 12px; }
+        
+        .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 10; font-size: 14px; color: var(--primary-color); }
+        
+        /* 弹窗样式 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: none;
+            justify-content: center; align-items: center; z-index: 50;
+            backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background: #fff; padding: 24px; border-radius: var(--radius);
+            width: 90%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h3 { margin: 0; font-size: 18px; color: var(--text-primary); }
+        .close-btn { background: none; color: #9ca3af; font-size: 24px; border: none; cursor: pointer; padding: 0; width: auto; }
+        .close-btn:hover { color: #111827; background: none; }
+        
+        .item-list-mini { list-style: none; padding: 0; margin-bottom: 20px; max-height: 40vh; overflow-y: auto; border-top: 1px solid var(--border-color); }
+        .item-list-mini li { padding: 12px 4px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        
+        .modal-actions { display: flex; gap: 10px; }
+        .modal-actions button { flex: 1; padding: 10px; font-size: 13px; }
+        .btn-danger { background-color: #fff; color: #ef4444; border: 1px solid #ef4444; }
+        .btn-danger:hover { background-color: #fef2f2; }
+        .btn-secondary { background-color: #f3f4f6; color: #374151; }
+        .btn-secondary:hover { background-color: #e5e7eb; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>家庭物品管理系统 <span style="font-size: 12px; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 10px; vertical-align: middle;">5x5 空间版</span></h1>
+        <p class="subtitle">点击空白处新建位置，点击位置查看物品，拖拽可换位</p>
+    </header>
+
+    <div class="layout-wrapper">
+        <div class="room-panel">
+            <div class="loading-overlay" id="gridLoading">同步位置信息中...</div>
+            <h2>
+                俯视空间图 
+                <span class="room-tip">💡 提示：点击方块查看/编辑，拖拽可换位</span>
+            </h2>
+            <div class="grid-container" id="roomGrid">
+                </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>入库登记</h2>
+                <form id="itemForm">
+                    <div class="form-group">
+                        <label>物品名称</label>
+                        <input type="text" id="itemName" required placeholder="如：护照、Switch">
+                    </div>
+                    <div class="form-group">
+                        <label>所属分类</label>
+                        <select id="itemCategory">
+                            <option>数码家电</option>
+                            <option>家具家居</option>
+                            <option>重要证件</option>
+                            <option>服饰鞋包</option>
+                            <option>其他闲置</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>存放位置 (自动同步空间图)</label>
+                        <select id="itemLocation" required>
+                            <option value="" disabled selected>请选择或添加...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>购入/建档日期</label>
+                        <input type="date" id="itemDate">
+                    </div>
+                    <button type="submit" id="submitBtn">保存至云端</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="loading-overlay" id="listLoading">加载物品中...</div>
+                <h2>物品清单汇总</h2>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>物品</th><th>分类</th><th>存放位置</th><th>日期</th><th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="locationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">位置名称</h3>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <ul class="item-list-mini" id="modalItemList">
+                </ul>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="btnRenameLoc">重命名该位置</button>
+                <button class="btn-danger" id="btnDeleteLoc">删除该位置</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Supabase
+        const supabaseUrl = 'https://ipenghldeyxmkbqjngqe.supabase.co'; 
+        const supabaseKey = 'sb_publishable_bg5MXHDR6xGhpdRmxvtOVg_TjFg2CrF';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let items = [];
+        let locations = [];
+        let draggedIndex = null; 
+        let currentActiveLoc = null; // 当前弹窗正在查看的位置
+
+        document.getElementById('itemDate').valueAsDate = new Date();
+
+        // 初始化拉取数据
+        async function initData() {
+            document.getElementById('gridLoading').style.display = 'flex';
+            document.getElementById('listLoading').style.display = 'flex';
+
+            const [itemsRes, locsRes] = await Promise.all([
+                supabaseClient.from('inventory').select('*').order('created_at', { ascending: false }),
+                supabaseClient.from('locations').select('*')
+            ]);
+
+            if (!itemsRes.error && !locsRes.error) {
+                items = itemsRes.data;
+                locations = locsRes.data;
+            } else {
+                alert('数据加载失败，请检查网络或配置');
+            }
+
+            document.getElementById('gridLoading').style.display = 'none';
+            document.getElementById('listLoading').style.display = 'none';
+
+            renderGrid();
+            renderLocationDropdown();
+            renderItems();
+        }
+
+        // ==========================================
+        // 1. 渲染 5x5 网格视图 (共 25 格)
+        // ==========================================
+        function renderGrid() {
+            const grid = document.getElementById('roomGrid');
+            grid.innerHTML = '';
+            
+            // 循环次数从 100 改为 25
+            for (let i = 0; i < 25; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.index = i;
+                
+                const loc = locations.find(l => l.grid_index === i);
+                
+                if (loc) {
+                    cell.classList.add('filled');
+                    cell.innerText = loc.name;
+                    cell.title = `点击查看物品`;
+                    cell.draggable = true;
+                    cell.addEventListener('dragstart', (e) => {
+                        draggedIndex = i;
+                        e.dataTransfer.setData('text/plain', i);
+                    });
+                } else {
+                    cell.innerText = '+';
+                    cell.style.color = '#e5e7eb';
+                }
+
+                cell.addEventListener('dragover', (e) => {
+                    e.preventDefault(); 
+                    if(draggedIndex !== null && draggedIndex !== i) {
+                        cell.classList.add('drag-over');
+                    }
+                });
+                
+                cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+                cell.addEventListener('drop', (e) => handleDrop(e, i));
+                cell.addEventListener('click', () => handleCellClick(i, loc));
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // 点击格子逻辑
+        function handleCellClick(index, existingLoc) {
+            if (existingLoc) {
+                // 如果有位置，打开弹窗
+                openModal(existingLoc);
+            } else {
+                // 如果是空位，新建位置
+                const newName = prompt('将此区域设为新存放位置，请输入名称：');
+                if (newName && newName.trim() !== '') {
+                    createNewLocation(newName.trim(), index);
+                }
+            }
+        }
+
+        // ==========================================
+        // 弹窗 (Modal) 控制逻辑
+        // ==========================================
+        function openModal(loc) {
+            currentActiveLoc = loc;
+            document.getElementById('locationModal').style.display = 'flex';
+            document.getElementById('modalTitle').innerText = loc.name;
+            
+            const listContainer = document.getElementById('modalItemList');
+            // 找出属于该位置的所有物品
+            const locItems = items.filter(i => i.location === loc.name);
+            
+            if (locItems.length === 0) {
+                listContainer.innerHTML = '<li style="color:#9ca3af; justify-content:center; border:none; padding-top:20px;">空空如也，暂无物品</li>';
+            } else {
+                listContainer.innerHTML = locItems.map(item => `
+                    <li>
+                        <span style="font-weight:500;">${item.name}</span>
+                        <span class="tag">${item.category}</span>
+                    </li>
+                `).join('');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('locationModal').style.display = 'none';
+            currentActiveLoc = null;
+        }
+
+        // 弹窗内的：重命名按钮
+        document.getElementById('btnRenameLoc').addEventListener('click', async () => {
+            if(!currentActiveLoc) return;
+            const newName = prompt('请输入新的位置名称：', currentActiveLoc.name);
+            if (newName && newName.trim() !== '' && newName !== currentActiveLoc.name) {
+                const finalName = newName.trim();
+                
+                document.getElementById('gridLoading').style.display = 'flex';
+                // 1. 更新位置表
+                await supabaseClient.from('locations').update({ name: finalName }).eq('id', currentActiveLoc.id);
+                // 2. 将之前在这个位置的物品，一并更新为新位置名 (避免物品丢失位置)
+                await supabaseClient.from('inventory').update({ location: finalName }).eq('location', currentActiveLoc.name);
+                
+                currentActiveLoc.name = finalName;
+                closeModal();
+                initData(); // 重新拉取一次全局数据以确保完全同步
+            }
+        });
+
+        // 弹窗内的：删除位置按钮
+        document.getElementById('btnDeleteLoc').addEventListener('click', async () => {
+            if(!currentActiveLoc) return;
+            // 检查是否有物品
+            const locItems = items.filter(i => i.location === currentActiveLoc.name);
+            let msg = `确定要删除格子【${currentActiveLoc.name}】吗？`;
+            if(locItems.length > 0) {
+                msg = `警告：该位置内还有 ${locItems.length} 件物品！\n删除位置后，这些物品将失去位置信息（但不会被删除）。\n\n确定要删除该位置吗？`;
+            }
+            
+            if(confirm(msg)) {
+                document.getElementById('gridLoading').style.display = 'flex';
+                await supabaseClient.from('locations').delete().eq('id', currentActiveLoc.id);
+                closeModal();
+                initData(); // 重新拉取一次全局数据
+            }
+        });
+
+
+        // ==========================================
+        // 拖拽互换逻辑 (不变)
+        // ==========================================
+        async function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            const sourceCell = document.querySelector(`.grid-cell[data-index='${targetIndex}']`);
+            if(sourceCell) sourceCell.classList.remove('drag-over');
+
+            if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+            const sourceLoc = locations.find(l => l.grid_index === draggedIndex);
+            const targetLoc = locations.find(l => l.grid_index === targetIndex);
+
+            document.getElementById('gridLoading').style.display = 'flex';
+
+            if (targetLoc) {
+                await supabaseClient.from('locations').update({ grid_index: targetIndex }).eq('id', sourceLoc.id);
+                await supabaseClient.from('locations').update({ grid_index: draggedIndex }).eq('id', targetLoc.id);
+                sourceLoc.grid_index = targetIndex;
+                targetLoc.grid_index = draggedIndex;
+            } else {
+                await supabaseClient.from('locations').update({ grid_index: targetIndex }).eq('id', sourceLoc.id);
+                sourceLoc.grid_index = targetIndex;
+            }
+
+            draggedIndex = null;
+            document.getElementById('gridLoading').style.display = 'none';
+            renderGrid();
+        }
+
+        // ==========================================
+        // 下拉菜单渲染与新建逻辑
+        // ==========================================
+        function renderLocationDropdown() {
+            const select = document.getElementById('itemLocation');
+            const currentVal = select.value; 
+            
+            select.innerHTML = '<option value="" disabled selected>请选择...</option>';
+            
+            locations.forEach(loc => {
+                const opt = document.createElement('option');
+                opt.value = loc.name;
+                opt.innerText = loc.name;
+                select.appendChild(opt);
+            });
+
+            const addOpt = document.createElement('option');
+            addOpt.value = "_add_new_";
+            addOpt.innerText = "+ 🆕 添加新存放位置...";
+            addOpt.style.color = "var(--primary-color)";
+            addOpt.style.fontWeight = "bold";
+            select.appendChild(addOpt);
+
+            if(currentVal && locations.some(l => l.name === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        document.getElementById('itemLocation').addEventListener('change', function(e) {
+            if (e.target.value === '_add_new_') {
+                const newName = prompt('请输入新存放位置的名称：\n(它将自动分配到上方空间的空闲区域)');
+                if (newName && newName.trim() !== '') {
+                    // 最大格子数改为 25
+                    let emptyIndex = 0;
+                    while (locations.some(l => l.grid_index === emptyIndex) && emptyIndex < 25) {
+                        emptyIndex++;
+                    }
+                    if(emptyIndex < 25) {
+                        createNewLocation(newName.trim(), emptyIndex, true);
+                    } else {
+                        alert('房间已满（25格）！无法添加新位置。');
+                        e.target.value = "";
+                    }
+                } else {
+                    e.target.value = ""; 
+                }
+            }
+        });
+
+        async function createNewLocation(name, index, updateSelect = false) {
+            document.getElementById('gridLoading').style.display = 'flex';
+            const { data, error } = await supabaseClient.from('locations').insert([{ name: name, grid_index: index }]).select();
+            document.getElementById('gridLoading').style.display = 'none';
+
+            if (error) { alert('添加位置失败！请检查控制台或RLS设置'); console.error(error); return; }
+
+            if(data && data.length > 0) {
+                locations.push(data[0]);
+                renderGrid();
+                renderLocationDropdown();
+                if(updateSelect) { document.getElementById('itemLocation').value = name; }
+            }
+        }
+
+        // ==========================================
+        // 物品清单与表单提交
+        // ==========================================
+        function renderItems() {
+            const tbody = document.getElementById('inventoryList');
+            tbody.innerHTML = '';
+            
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:30px;">当前还没有记录任何物品哦</td></tr>`;
+                return;
+            }
+            
+            items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 500;">${item.name}</td>
+                    <td><span class="tag">${item.category}</span></td>
+                    <td>${item.location}</td>
+                    <td style="color: #6b7280;">${item.date || '-'}</td>
+                    <td><button class="delete-btn" onclick="deleteItem('${item.id}', ${index})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('itemForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true; btn.innerText = '正在保存...';
+            
+            const newItem = {
+                name: document.getElementById('itemName').value,
+                category: document.getElementById('itemCategory').value,
+                location: document.getElementById('itemLocation').value,
+                date: document.getElementById('itemDate').value
+            };
+            
+            const { data, error } = await supabaseClient.from('inventory').insert([newItem]).select();
+            
+            btn.disabled = false; btn.innerText = '保存至云端';
+
+            if (error) { alert('保存物品失败！'); return; }
+            
+            if(data && data.length > 0) {
+                items.unshift(data[0]); 
+                renderItems();
+            }
+            
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemName').focus();
+        });
+
+        async function deleteItem(id, index) {
+            if(confirm('确定要彻底删除这条物品吗？')) {
+                await supabaseClient.from('inventory').delete().eq('id', id);
+                items = items.filter(i => i.id !== id);
+                renderItems();
+            }
+        }
+
+        initData();
+    </script>
+</body>
+</html>
