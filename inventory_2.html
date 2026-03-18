@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭物品管理系统 - 空间全景版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2; --primary-hover: #357abd;
+            --background-color: #f4f6f8; --surface-color: #ffffff;
+            --text-primary: #111827; --text-secondary: #6b7280;
+            --border-color: #e5e7eb; --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            --grid-color: #10b981; /* 位置方块的颜色 */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: var(--background-color); color: var(--text-primary); padding: 20px; }
+        
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { font-weight: 600; font-size: 26px; }
+        p.subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 5px; }
+
+        .layout-wrapper { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* 顶部房间视图 */
+        .room-panel { background: var(--surface-color); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        .room-panel h2 { font-size: 16px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .room-tip { font-size: 12px; color: var(--text-secondary); font-weight: normal; }
+        
+        /* 10x10 网格 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            background-color: #f9fafb;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .grid-cell {
+            aspect-ratio: 1;
+            background-color: #ffffff;
+            border: 1px dashed #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            text-align: center;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            user-select: none;
+            overflow: hidden;
+            word-break: break-all;
+            padding: 2px;
+        }
+        .grid-cell:hover { border-color: var(--primary-color); background-color: #eff6ff; }
+        .grid-cell.filled {
+            background-color: var(--grid-color);
+            border: 1px solid #059669;
+            color: white;
+            font-weight: 500;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2);
+            cursor: grab;
+        }
+        .grid-cell.filled:active { cursor: grabbing; }
+        .grid-cell.drag-over { background-color: #fcd34d !important; border-color: #d97706 !important; }
+
+        /* 下方表单与列表 */
+        .main-content { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+        @media (max-width: 860px) { .main-content { grid-template-columns: 1fr; } }
+
+        .panel { background: var(--surface-color); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border-color); position: relative; }
+        .panel h2 { font-size: 16px; margin-bottom: 15px; }
+
+        .form-group { margin-bottom: 14px; }
+        label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background-color: #f9fafb; }
+        input:focus, select:focus { outline: none; border-color: var(--primary-color); background-color: #fff; box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1); }
+        
+        button { background-color: var(--primary-color); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 14px; width: 100%; transition: background 0.2s; }
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-secondary); background-color: #f9fafb; font-weight: 500; }
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; background-color: #e5edff; color: #1e40af; }
+        .delete-btn { background: transparent; color: #ef4444; border: 1px solid #ef4444; padding: 4px 8px; width: auto; font-size: 12px; }
+        
+        .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 10; font-size: 14px; color: var(--primary-color); }
+        
+        .filter-status { font-size: 12px; color: var(--primary-color); font-weight: normal; margin-left: 10px; cursor: pointer; display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>家庭物品管理系统 <span style="font-size: 12px; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 10px; vertical-align: middle;">空间视图版</span></h1>
+        <p class="subtitle">点击空白处新建位置，拖拽可自由调整布局</p>
+    </header>
+
+    <div class="layout-wrapper">
+        <div class="room-panel">
+            <div class="loading-overlay" id="gridLoading">同步位置信息中...</div>
+            <h2>
+                俯视空间图 
+                <span class="room-tip">💡 提示：点击方块可编辑，拖拽可换位</span>
+            </h2>
+            <div class="grid-container" id="roomGrid">
+                </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>入库登记</h2>
+                <form id="itemForm">
+                    <div class="form-group">
+                        <label>物品名称</label>
+                        <input type="text" id="itemName" required placeholder="如：护照、Switch">
+                    </div>
+                    <div class="form-group">
+                        <label>所属分类</label>
+                        <select id="itemCategory">
+                            <option>数码家电</option>
+                            <option>家具家居</option>
+                            <option>重要证件</option>
+                            <option>服饰鞋包</option>
+                            <option>其他闲置</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>存放位置 (自动同步空间图)</label>
+                        <select id="itemLocation" required>
+                            <option value="" disabled selected>请选择或添加...</option>
+                            </select>
+                    </div>
+                    <div class="form-group">
+                        <label>购入/建档日期</label>
+                        <input type="date" id="itemDate">
+                    </div>
+                    <button type="submit" id="submitBtn">保存至云端</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="loading-overlay" id="listLoading">加载物品中...</div>
+                <h2>
+                    物品清单 
+                    <span id="filterStatus" class="filter-status" onclick="clearFilter()">[ 取消位置筛选 (显示全部) ]</span>
+                </h2>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>物品</th><th>分类</th><th>存放位置</th><th>日期</th><th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Supabase
+        const supabaseUrl = 'https://ipenghldeyxmkbqjngqe.supabase.co'; 
+        const supabaseKey = 'sb_publishable_bg5MXHDR6xGhpdRmxvtOVg_TjFg2CrF';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let items = [];
+        let locations = [];
+        let currentFilterLocation = null; // 当前查看的特定位置
+        let draggedIndex = null; // 用于记录拖拽的起始格子
+
+        document.getElementById('itemDate').valueAsDate = new Date();
+
+        // 核心初始化
+        async function initData() {
+            document.getElementById('gridLoading').style.display = 'flex';
+            document.getElementById('listLoading').style.display = 'flex';
+
+            // 同时拉取物品和位置信息
+            const [itemsRes, locsRes] = await Promise.all([
+                supabaseClient.from('inventory').select('*').order('created_at', { ascending: false }),
+                supabaseClient.from('locations').select('*')
+            ]);
+
+            if (itemsRes.error || locsRes.error) {
+                alert('数据加载失败！请确保你已经在 Supabase 新建了 locations 表并关闭了它的 RLS。');
+                console.error(itemsRes.error, locsRes.error);
+                return;
+            }
+
+            items = itemsRes.data;
+            locations = locsRes.data;
+
+            document.getElementById('gridLoading').style.display = 'none';
+            document.getElementById('listLoading').style.display = 'none';
+
+            renderGrid();
+            renderLocationDropdown();
+            renderItems();
+        }
+
+        // ==========================================
+        // 1. 渲染 10x10 网格视图
+        // ==========================================
+        function renderGrid() {
+            const grid = document.getElementById('roomGrid');
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < 100; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.index = i;
+                
+                // 查找该格子是否被占用
+                const loc = locations.find(l => l.grid_index === i);
+                
+                if (loc) {
+                    cell.classList.add('filled');
+                    cell.innerText = loc.name;
+                    cell.title = `点击编辑此位置，或拖拽移动`;
+                    
+                    // 开启拖拽属性
+                    cell.draggable = true;
+                    
+                    // 拖拽事件监听
+                    cell.addEventListener('dragstart', (e) => {
+                        draggedIndex = i;
+                        e.dataTransfer.setData('text/plain', i);
+                    });
+                } else {
+                    cell.innerText = '+';
+                    cell.style.color = '#e5e7eb';
+                }
+
+                // 放置目标事件（允许丢到这个格子上）
+                cell.addEventListener('dragover', (e) => {
+                    e.preventDefault(); 
+                    if(draggedIndex !== null && draggedIndex !== i) {
+                        cell.classList.add('drag-over');
+                    }
+                });
+                
+                cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+                
+                cell.addEventListener('drop', (e) => handleDrop(e, i));
+
+                // 点击事件（新增或编辑）
+                cell.addEventListener('click', () => handleCellClick(i, loc));
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // 处理格子点击逻辑
+        async function handleCellClick(index, existingLoc) {
+            if (existingLoc) {
+                // 已有位置：询问是要改名、看物品还是删除
+                const action = prompt(`管理位置【${existingLoc.name}】\n\n输入新名称可重命名；\n清空内容并回车可删除该位置；\n点击"取消"则在下方筛选显示该位置物品。`, existingLoc.name);
+                
+                if (action === null) {
+                    // 点击取消，执行筛选物品功能
+                    currentFilterLocation = existingLoc.name;
+                    renderItems();
+                } else if (action.trim() === '') {
+                    // 清空并确认，执行删除
+                    if(confirm(`确定删除位置【${existingLoc.name}】吗？`)) {
+                        await supabaseClient.from('locations').delete().eq('id', existingLoc.id);
+                        locations = locations.filter(l => l.id !== existingLoc.id);
+                        renderGrid(); renderLocationDropdown();
+                    }
+                } else if (action.trim() !== existingLoc.name) {
+                    // 重命名
+                    const newName = action.trim();
+                    await supabaseClient.from('locations').update({ name: newName }).eq('id', existingLoc.id);
+                    existingLoc.name = newName;
+                    renderGrid(); renderLocationDropdown();
+                }
+            } else {
+                // 空白格子：新建位置
+                const newName = prompt('将此区域设为新存放位置，请输入名称：');
+                if (newName && newName.trim() !== '') {
+                    createNewLocation(newName.trim(), index);
+                }
+            }
+        }
+
+        // 处理拖拽互换/移动逻辑
+        async function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            const sourceCell = document.querySelector(`.grid-cell[data-index='${targetIndex}']`);
+            if(sourceCell) sourceCell.classList.remove('drag-over');
+
+            if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+            const sourceLoc = locations.find(l => l.grid_index === draggedIndex);
+            const targetLoc = locations.find(l => l.grid_index === targetIndex);
+
+            document.getElementById('gridLoading').style.display = 'flex';
+
+            if (targetLoc) {
+                // 目标位置有东西：互换索引
+                await supabaseClient.from('locations').update({ grid_index: targetIndex }).eq('id', sourceLoc.id);
+                await supabaseClient.from('locations').update({ grid_index: draggedIndex }).eq('id', targetLoc.id);
+                sourceLoc.grid_index = targetIndex;
+                targetLoc.grid_index = draggedIndex;
+            } else {
+                // 目标位置为空：直接移动
+                await supabaseClient.from('locations').update({ grid_index: targetIndex }).eq('id', sourceLoc.id);
+                sourceLoc.grid_index = targetIndex;
+            }
+
+            draggedIndex = null;
+            document.getElementById('gridLoading').style.display = 'none';
+            renderGrid();
+        }
+
+        // ==========================================
+        // 2. 渲染表单中的下拉菜单
+        // ==========================================
+        function renderLocationDropdown() {
+            const select = document.getElementById('itemLocation');
+            const currentVal = select.value; // 记住当前选中的值
+            
+            select.innerHTML = '<option value="" disabled selected>请选择...</option>';
+            
+            locations.forEach(loc => {
+                const opt = document.createElement('option');
+                opt.value = loc.name;
+                opt.innerText = loc.name;
+                select.appendChild(opt);
+            });
+
+            // 在最后增加一项“添加新位置”
+            const addOpt = document.createElement('option');
+            addOpt.value = "_add_new_";
+            addOpt.innerText = "+ 🆕 添加新存放位置...";
+            addOpt.style.color = "var(--primary-color)";
+            addOpt.style.fontWeight = "bold";
+            select.appendChild(addOpt);
+
+            // 恢复之前的值，如果没有则选默认
+            if(currentVal && locations.some(l => l.name === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        // 监听下拉菜单变化
+        document.getElementById('itemLocation').addEventListener('change', function(e) {
+            if (e.target.value === '_add_new_') {
+                const newName = prompt('请输入新存放位置的名称：\n(它将自动分配到上方空间的空闲区域)');
+                if (newName && newName.trim() !== '') {
+                    // 寻找第一个空的格子
+                    let emptyIndex = 0;
+                    while (locations.some(l => l.grid_index === emptyIndex) && emptyIndex < 100) {
+                        emptyIndex++;
+                    }
+                    if(emptyIndex < 100) {
+                        createNewLocation(newName.trim(), emptyIndex, true);
+                    } else {
+                        alert('房间已满！无法添加新位置。');
+                        e.target.value = "";
+                    }
+                } else {
+                    e.target.value = ""; // 取消输入则重置
+                }
+            }
+        });
+
+        // 封装向云端写入新位置的通用方法
+        async function createNewLocation(name, index, updateSelect = false) {
+            document.getElementById('gridLoading').style.display = 'flex';
+            const { data, error } = await supabaseClient.from('locations').insert([{ name: name, grid_index: index }]).select();
+            document.getElementById('gridLoading').style.display = 'none';
+
+            if (error) {
+                alert('添加位置失败！'); console.error(error); return;
+            }
+
+            if(data && data.length > 0) {
+                locations.push(data[0]);
+                renderGrid();
+                renderLocationDropdown();
+                if(updateSelect) {
+                    document.getElementById('itemLocation').value = name;
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. 物品清单列表与表单提交
+        // ==========================================
+        function renderItems() {
+            const tbody = document.getElementById('inventoryList');
+            tbody.innerHTML = '';
+            
+            const filterStatusBtn = document.getElementById('filterStatus');
+            
+            // 过滤逻辑
+            let displayItems = items;
+            if (currentFilterLocation) {
+                displayItems = items.filter(item => item.location === currentFilterLocation);
+                filterStatusBtn.style.display = 'inline-block';
+                filterStatusBtn.innerText = `[ 当前仅显示: ${currentFilterLocation} (点击取消) ]`;
+            } else {
+                filterStatusBtn.style.display = 'none';
+            }
+
+            if (displayItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:30px;">当前还没有记录任何物品哦</td></tr>`;
+                return;
+            }
+            
+            displayItems.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 500;">${item.name}</td>
+                    <td><span class="tag">${item.category}</span></td>
+                    <td>${item.location}</td>
+                    <td style="color: #6b7280;">${item.date || '-'}</td>
+                    <td><button class="delete-btn" onclick="deleteItem('${item.id}', ${index})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function clearFilter() {
+            currentFilterLocation = null;
+            renderItems();
+        }
+
+        // 新增物品表单提交
+        document.getElementById('itemForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true; btn.innerText = '正在保存...';
+            
+            const newItem = {
+                name: document.getElementById('itemName').value,
+                category: document.getElementById('itemCategory').value,
+                location: document.getElementById('itemLocation').value,
+                date: document.getElementById('itemDate').value
+            };
+            
+            const { data, error } = await supabaseClient.from('inventory').insert([newItem]).select();
+            
+            btn.disabled = false; btn.innerText = '保存至云端';
+
+            if (error) { alert('保存物品失败！'); return; }
+            
+            if(data && data.length > 0) {
+                items.unshift(data[0]); 
+                renderItems();
+            }
+            
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemName').focus();
+        });
+
+        async function deleteItem(id, index) {
+            if(confirm('确定要彻底删除这条物品吗？')) {
+                await supabaseClient.from('inventory').delete().eq('id', id);
+                items = items.filter(i => i.id !== id);
+                renderItems();
+            }
+        }
+
+        // 启动应用
+        initData();
+    </script>
+</body>
+</html>
