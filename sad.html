@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Clearing | Your Space to Breathe</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --accent-color: #8da9c4;
+            --text-color: #2f3e46;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            transition: background 1s ease;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        header {
+            margin-bottom: 40px;
+            margin-top: 20px;
+        }
+
+        h1 { font-weight: 300; letter-spacing: 2px; }
+
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        /* Breathing Circle Animation */
+        .breath-container {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .circle {
+            width: 100px;
+            height: 100px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            opacity: 0.6;
+            transition: transform 4s linear;
+        }
+
+        .breathing-instruction {
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 30px;
+        }
+
+        /* Controls */
+        button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.3s;
+        }
+
+        button:hover { opacity: 0.8; }
+
+        .hidden { display: none; }
+
+        .affirmation {
+            font-style: italic;
+            font-size: 1.1rem;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>The Clearing</h1>
+        <p>Take a moment for yourself.</p>
+    </header>
+
+    <div class="card" id="breathing-app">
+        <div class="breathing-instruction" id="breath-text">Press Start to Breathe</div>
+        <div class="breath-container">
+            <div class="circle" id="circle"></div>
+        </div>
+        <button onclick="startBreathing()" id="breath-btn">Start Box Breathing</button>
+    </div>
+
+    <div class="card">
+        <h3>5-4-3-2-1 Grounding</h3>
+        <p id="grounding-text">Click to start a grounding exercise to quiet your mind.</p>
+        <button onclick="nextGrounding()">Guide Me</button>
+    </div>
+
+    <div class="card">
+        <h3>A Soft Reminder</h3>
+        <p class="affirmation" id="affirmation-display">"I am doing the best I can with the tools I have right now."</p>
+        <button onclick="newAffirmation()" style="background: none; color: var(--accent-color); border: 1px solid var(--accent-color);">New Thought</button>
+    </div>
+</div>
+
+<script>
+    // Breathing Logic
+    let breathInterval;
+    function startBreathing() {
+        const circle = document.getElementById('circle');
+        const text = document.getElementById('breath-text');
+        const btn = document.getElementById('breath-btn');
+        btn.classList.add('hidden');
+        
+        let phase = 0;
+        const routine = [
+            { txt: "Inhale...", scale: "scale(1.8)", time: 4000 },
+            { txt: "Hold...", scale: "scale(1.8)", time: 4000 },
+            { txt: "Exhale...", scale: "scale(1.0)", time: 4000 },
+            { txt: "Hold...", scale: "scale(1.0)", time: 4000 }
+        ];
+
+        function run() {
+            const current = routine[phase];
+            text.innerText = current.txt;
+            circle.style.transform = current.scale;
+            phase = (phase + 1) % routine.length;
+        }
+
+        run();
+        breathInterval = setInterval(run, 4000);
+    }
+
+    // Grounding Logic
+    const groundingSteps = [
+        "Acknowledge 5 things you see around you.",
+        "Acknowledge 4 things you can touch.",
+        "Acknowledge 3 things you hear.",
+        "Acknowledge 2 things you can smell.",
+        "Acknowledge 1 thing you can taste."
+    ];
+    let groundIdx = 0;
+    function nextGrounding() {
+        document.getElementById('grounding-text').innerText = groundingSteps[groundIdx];
+        groundIdx = (groundIdx + 1) % groundingSteps.length;
+    }
+
+    // Affirmations
+    const affirmations = [
+        "This feeling is temporary.",
+        "I have survived every bad day so far.",
+        "I am worthy of peace.",
+        "My productivity does not define my worth.",
+        "I am safe in this moment."
+    ];
+    function newAffirmation() {
+        const rand = Math.floor(Math.random() * affirmations.length);
+        document.getElementById('affirmation-display').innerText = `"${affirmations[rand]}"`;
+    }
+</script>
+
+</body>
+</html>
