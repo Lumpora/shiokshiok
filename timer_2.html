@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immersive Clock & Timer</title>
+    <style>
+        /* CSS Variables */
+        :root {
+            --bg-color: #050505;
+            --text-color: #ffffff;
+            --font-size: 13vw;
+        }
+
+        /* Unified Typography */
+        body, input, button {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* Fixed Navigation */
+        .nav {
+            position: fixed;
+            top: 40px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            opacity: 0.3;
+            transition: opacity 0.4s ease;
+            z-index: 50;
+        }
+
+        .nav:hover {
+            opacity: 1;
+        }
+
+        .nav button {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1rem;
+            margin: 0 15px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            padding-bottom: 8px;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+
+        .nav button:hover {
+            opacity: 1;
+        }
+
+        .nav button.active {
+            opacity: 1;
+            border-bottom: 1px solid var(--text-color);
+        }
+
+        /* Views */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+            animation: fadeIn 0.8s ease forwards;
+        }
+
+        /* UNIFIED MASSIVE TYPOGRAPHY */
+        .time-display, .timer-setup {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: var(--font-size);
+            font-weight: 200;
+            letter-spacing: -3px;
+            line-height: 1;
+            margin: 0;
+            font-variant-numeric: tabular-nums;
+            transition: font-size 0.2s ease;
+        }
+
+        /* Minimalist Inputs */
+        .timer-setup input {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            width: 2.2ch;
+            text-align: center;
+            font-size: inherit;
+            font-weight: inherit;
+            letter-spacing: inherit;
+            font-variant-numeric: inherit;
+            outline: none;
+            border-bottom: 2px solid transparent;
+            padding: 0;
+            transition: border-color 0.3s;
+        }
+
+        .timer-setup input:focus, .timer-setup input:hover {
+            border-bottom: 2px solid var(--text-color);
+            opacity: 0.7;
+        }
+
+        .timer-setup span {
+            opacity: 0.3;
+            margin: 0 5px;
+            transform: translateY(-2px);
+        }
+
+        #timer-countdown {
+            display: none;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* Controls */
+        .controls {
+            margin-top: 50px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            height: 40px;
+        }
+
+        .container:hover .controls {
+            opacity: 1;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
+            padding: 10px 30px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0 10px;
+            text-transform: uppercase;
+            opacity: 0.6;
+        }
+
+        .btn:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Settings Modal */
+        .settings-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+        }
+
+        .settings-overlay.active {
+            display: flex;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .settings-panel {
+            background: #111;
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 320px;
+            text-align: left;
+            color: #fff; 
+        }
+
+        .settings-panel h2 {
+            margin-top: 0;
+            font-weight: 300;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            text-align: center;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .setting-item {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-item label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: 300;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%; }
+        
+        input[type="range"] {
+            width: 140px;
+            cursor: pointer;
+            accent-color: #fff;
+        }
+
+        .close-btn-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="nav">
+        <button id="nav-clock" class="active" onclick="switchView('clock')">Clock</button>
+        <button id="nav-timer" onclick="switchView('timer')">Timer</button>
+        <button onclick="toggleSettings()">Settings</button>
+    </div>
+
+    <div class="container">
+        <div id="view-clock" class="view active">
+            <div class="time-display" id="clock-display">00:00:00</div>
+        </div>
+
+        <div id="view-timer" class="view">
+            <div id="timer-setup" class="timer-setup">
+                <input type="text" id="input-h" value="00" maxlength="2" onclick="this.select()">
+                <span>:</span>
+                <input type="text" id="input-m" value="05" maxlength="2" onclick="this.select()">
+                <span>:</span>
+                <input type="text" id="input-s" value="00" maxlength="2" onclick="this.select()">
+            </div>
+
+            <div class="time-display" id="timer-countdown">00:00:00</div>
+
+            <div class="controls">
+                <button class="btn" id="btn-start" onclick="toggleTimer()">Start</button>
+                <button class="btn" onclick="resetTimer()">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-overlay" class="settings-overlay">
+        <div class="settings-panel">
+            <h2>Appearance</h2>
+            
+            <div class="setting-item">
+                <label>Background Color</label>
+                <input type="color" id="color-bg" value="#050505">
+            </div>
+            
+            <div class="setting-item">
+                <label>Text Color</label>
+                <input type="color" id="color-text" value="#ffffff">
+            </div>
+            
+            <div class="setting-item">
+                <label>Font Size</label>
+                <input type="range" id="size-font" min="5" max="25" value="13" step="1">
+            </div>
+
+            <div class="close-btn-container">
+                <button class="btn" style="color: #fff; border-color: #fff;" onclick="toggleSettings()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- SETTINGS & LOCAL STORAGE LOGIC ---
+        const root = document.documentElement;
+        
+        // Load saved settings (or use defaults)
+        const savedBg = localStorage.getItem('timer-bg') || '#050505';
+        const savedText = localStorage.getItem('timer-text') || '#ffffff';
+        const savedSize = localStorage.getItem('timer-size') || '13';
+
+        // Apply settings on load
+        root.style.setProperty('--bg-color', savedBg);
+        root.style.setProperty('--text-color', savedText);
+        root.style.setProperty('--font-size', savedSize + 'vw');
+
+        // Update menu inputs to match saved settings
+        document.getElementById('color-bg').value = savedBg;
+        document.getElementById('color-text').value = savedText;
+        document.getElementById('size-font').value = savedSize;
+        
+        // Listeners to save settings instantly
+        document.getElementById('color-bg').addEventListener('input', (e) => {
+            root.style.setProperty('--bg-color', e.target.value);
+            localStorage.setItem('timer-bg', e.target.value);
+        });
+        
+        document.getElementById('color-text').addEventListener('input', (e) => {
+            root.style.setProperty('--text-color', e.target.value);
+            localStorage.setItem('timer-text', e.target.value);
+        });
+        
+        document.getElementById('size-font').addEventListener('input', (e) => {
+            root.style.setProperty('--font-size', e.target.value + 'vw');
+            localStorage.setItem('timer-size', e.target.value);
+        });
+
+        function toggleSettings() {
+            const overlay = document.getElementById('settings-overlay');
+            overlay.classList.toggle('active');
+        }
+
+        // --- CLOCK LOGIC ---
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('clock-display').textContent = timeString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock(); 
+
+        // --- VIEW SWITCHER ---
+        function switchView(view) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(`view-${view}`).classList.add('active');
+            document.getElementById(`nav-${view}`).classList.add('active');
+        }
+
+        // --- TIMER LOGIC ---
+        let timerInterval = null;
+        let totalSeconds = 0;
+        let isRunning = false;
+
+        const inputH = document.getElementById('input-h');
+        const inputM = document.getElementById('input-m');
+        const inputS = document.getElementById('input-s');
+        const setupDiv = document.getElementById('timer-setup');
+        const countdownDisplay = document.getElementById('timer-countdown');
+        const btnStart = document.getElementById('btn-start');
+
+        function pad(num) {
+            return num.toString().padStart(2, '0');
+        }
+
+        [inputH, inputM, inputS].forEach(input => {
+            input.addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+            input.addEventListener('blur', function() {
+                if(this.value === '') this.value = '00';
+                else this.value = pad(parseInt(this.value));
+            });
+        });
+
+        function toggleTimer() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (totalSeconds === 0) {
+                const h = parseInt(inputH.value) || 0;
+                const m = parseInt(inputM.value) || 0;
+                const s = parseInt(inputS.value) || 0;
+                totalSeconds = (h * 3600) + (m * 60) + s;
+                
+                if (totalSeconds === 0) return; 
+            }
+
+            isRunning = true;
+            btnStart.textContent = 'Pause';
+            
+            setupDiv.style.display = 'none';
+            countdownDisplay.style.display = 'flex';
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                totalSeconds--;
+                updateTimerDisplay();
+
+                if (totalSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    timerFinished();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            btnStart.textContent = 'Resume';
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            totalSeconds = 0;
+            btnStart.textContent = 'Start';
+            
+            setupDiv.style.display = 'flex';
+            countdownDisplay.style.display = 'none';
+        }
+
+        function updateTimerDisplay() {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+
+            if (h > 0) {
+                countdownDisplay.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+            } else {
+                countdownDisplay.textContent = `${pad(m)}:${pad(s)}`;
+            }
+        }
+
+        function timerFinished() {
+            isRunning = false;
+            btnStart.textContent = 'Start';
+            countdownDisplay.textContent = "00:00";
+            
+            const originalBg = root.style.getPropertyValue('--bg-color') || '#050505';
+            root.style.setProperty('--bg-color', '#3a0000');
+            setTimeout(() => {
+                root.style.setProperty('--bg-color', originalBg);
+            }, 800);
+        }
+    </script>
+</body>
+</html>
